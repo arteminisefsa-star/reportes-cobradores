@@ -37,6 +37,7 @@ const fields = {
 const previewTotal = document.querySelector("#previewTotal");
 const previewNet = document.querySelector("#previewNet");
 const reportRows = document.querySelector("#reportRows");
+const mobileReportList = document.querySelector("#mobileReportList");
 const emptyState = document.querySelector("#emptyState");
 const dateFromFilter = document.querySelector("#dateFromFilter");
 const dateToFilter = document.querySelector("#dateToFilter");
@@ -286,6 +287,7 @@ function renderSummary(visibleReports) {
 
 function renderRows(visibleReports) {
   reportRows.innerHTML = "";
+  mobileReportList.innerHTML = "";
   emptyState.style.display = visibleReports.length ? "none" : "flex";
 
   for (const report of visibleReports) {
@@ -330,6 +332,84 @@ function renderRows(visibleReports) {
       `;
     }
     reportRows.append(row);
+
+    const card = document.createElement("article");
+    card.className = "mobile-report-card";
+    card.dataset.reportId = report.id;
+
+    if (editingId === report.id) {
+      card.innerHTML = `
+        <div class="mobile-card-head">
+          <div>
+            <strong>Editar reporte</strong>
+            <span>${formatDateTime(report.createdAt)}</span>
+          </div>
+        </div>
+        <label>
+          <span>Cobrador</span>
+          <select class="table-input" name="collector" required>
+            ${collectorOptionsHtml(report.collector)}
+          </select>
+        </label>
+        <div class="mobile-edit-grid">
+          <label>
+            <span>Efectivo</span>
+            <input class="table-input money-input" inputmode="decimal" name="cash" value="${report.cash || ""}">
+          </label>
+          <label>
+            <span>Transferencia</span>
+            <input class="table-input money-input" inputmode="decimal" name="transfer" value="${report.transfer || ""}">
+          </label>
+          <label>
+            <span>Gastos</span>
+            <input class="table-input money-input" inputmode="decimal" name="expenses" value="${report.expenses || ""}">
+          </label>
+        </div>
+        <label>
+          <span>Gastos detalle</span>
+          <textarea class="table-textarea" name="expenseDetail">${escapeHtml(report.expenseDetail || "")}</textarea>
+        </label>
+        <label>
+          <span>Observaciones</span>
+          <textarea class="table-textarea" name="notes">${escapeHtml(report.notes || "")}</textarea>
+        </label>
+        <div class="row-actions">
+          <button class="secondary row-edit" type="button" data-action="save" data-id="${report.id}">Guardar</button>
+          <button class="secondary" type="button" data-action="cancel" data-id="${report.id}">Cancelar</button>
+        </div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="mobile-card-head">
+          <div>
+            <strong>${escapeHtml(report.collector)}</strong>
+            <span>${formatDateTime(report.createdAt)}</span>
+          </div>
+          <strong class="mobile-net">${formatMoney(report.net)}</strong>
+        </div>
+        <dl class="mobile-money-grid">
+          <div><dt>Efectivo</dt><dd>${formatMoney(report.cash)}</dd></div>
+          <div><dt>Transferencia</dt><dd>${formatMoney(report.transfer)}</dd></div>
+          <div><dt>Gastos</dt><dd>${formatMoney(report.expenses)}</dd></div>
+          <div><dt>Total de cobro</dt><dd>${formatMoney(report.total)}</dd></div>
+          <div><dt>Cobro neto</dt><dd>${formatMoney(report.net)}</dd></div>
+        </dl>
+        <div class="mobile-note">
+          <span>Gastos detalle</span>
+          <p>${escapeHtml(report.expenseDetail || "-")}</p>
+        </div>
+        <div class="mobile-note">
+          <span>Observaciones</span>
+          <p>${escapeHtml(report.notes || "-")}</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary row-edit" type="button" data-action="edit" data-id="${report.id}">Editar</button>
+          <button class="secondary row-delete" type="button" data-action="delete" data-id="${report.id}">Borrar</button>
+        </div>
+      `;
+    }
+
+    mobileReportList.append(card);
   }
 }
 
@@ -498,6 +578,14 @@ clearReports.addEventListener("click", async () => {
 });
 
 reportRows.addEventListener("click", async (event) => {
+  await handleReportAction(event);
+});
+
+mobileReportList.addEventListener("click", async (event) => {
+  await handleReportAction(event);
+});
+
+async function handleReportAction(event) {
   const button = event.target.closest("[data-id]");
   if (!button) return;
 
@@ -554,7 +642,7 @@ reportRows.addEventListener("click", async (event) => {
       alert(error.message);
     }
   }
-});
+}
 
 currentDate.textContent = new Intl.DateTimeFormat("es-AR", {
   weekday: "long",
