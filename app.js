@@ -1,6 +1,25 @@
 const storageKey = "reportes-cobradores-v1";
 const localAdminPassword = "1234";
 const usesLocalFile = window.location.protocol === "file:";
+const collectors = [
+  "Felipe Pico",
+  "Carlos Gomez",
+  "Franco Nicolas Encina",
+  "Gustavo Gimenez",
+  "Maria Jose Lobos",
+  "Maryuri Lopez",
+  "Matias Martinez",
+  "Walter Martinez",
+  "Mariana Quinteros",
+  "Alejandro Balberdi",
+  "Alejandro Gamarra",
+  "Mario Veron",
+  "Resquin Alejandra",
+  "Rodrigo Galeano",
+  "Damian Alvarez",
+  "Enrique Sibilla",
+  "Nilson Lopez",
+];
 
 const form = document.querySelector("#reportForm");
 const currentDate = document.querySelector("#currentDate");
@@ -209,7 +228,8 @@ function getFilteredReports() {
 
 function renderCollectorFilter() {
   const selected = collectorFilter.value;
-  const names = [...new Set(reports.map((report) => report.collector).filter(Boolean))].sort();
+  const reportNames = reports.map((report) => report.collector).filter(Boolean);
+  const names = [...new Set([...collectors, ...reportNames])].sort();
 
   collectorFilter.innerHTML = '<option value="">Todos</option>';
   for (const name of names) {
@@ -219,6 +239,27 @@ function renderCollectorFilter() {
     collectorFilter.append(option);
   }
   collectorFilter.value = names.includes(selected) ? selected : "";
+}
+
+function renderCollectorSelect(selected = "") {
+  fields.collector.innerHTML = '<option value="">Seleccionar cobrador</option>';
+  for (const name of collectors) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    fields.collector.append(option);
+  }
+  fields.collector.value = collectors.includes(selected) ? selected : "";
+}
+
+function collectorOptionsHtml(selected = "") {
+  return [
+    '<option value="">Seleccionar cobrador</option>',
+    ...collectors.map((name) => {
+      const isSelected = name === selected ? " selected" : "";
+      return `<option value="${escapeAttribute(name)}"${isSelected}>${escapeHtml(name)}</option>`;
+    }),
+  ].join("");
 }
 
 function renderSummary(visibleReports) {
@@ -254,7 +295,11 @@ function renderRows(visibleReports) {
     if (editingId === report.id) {
       row.innerHTML = `
         <td>${formatDateTime(report.createdAt)}</td>
-        <td><input class="table-input" name="collector" value="${escapeAttribute(report.collector)}"></td>
+        <td>
+          <select class="table-input" name="collector" required>
+            ${collectorOptionsHtml(report.collector)}
+          </select>
+        </td>
         <td><input class="table-input money-input" inputmode="decimal" name="cash" value="${report.cash || ""}"></td>
         <td><input class="table-input money-input" inputmode="decimal" name="transfer" value="${report.transfer || ""}"></td>
         <td><input class="table-input money-input" inputmode="decimal" name="expenses" value="${report.expenses || ""}"></td>
@@ -518,6 +563,7 @@ currentDate.textContent = new Intl.DateTimeFormat("es-AR", {
   year: "numeric",
 }).format(new Date());
 
+renderCollectorSelect();
 updatePreview();
 refreshReports().catch((error) => {
   console.error(error);
