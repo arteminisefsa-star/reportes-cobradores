@@ -26,6 +26,8 @@ const exportCsv = document.querySelector("#exportCsv");
 const clearReports = document.querySelector("#clearReports");
 const formTitle = document.querySelector("#formTitle");
 const submitReport = document.querySelector("#submitReport");
+const filterNetTotal = document.querySelector("#filterNetTotal");
+const filterExpenseTotal = document.querySelector("#filterExpenseTotal");
 
 const summary = {
   cash: document.querySelector("#sumCash"),
@@ -237,6 +239,8 @@ function renderSummary(visibleReports) {
   summary.expenses.textContent = formatMoney(totals.expenses);
   summary.total.textContent = formatMoney(totals.total);
   summary.net.textContent = formatMoney(totals.net);
+  filterNetTotal.textContent = formatMoney(totals.net);
+  filterExpenseTotal.textContent = formatMoney(totals.expenses);
 }
 
 function renderRows(visibleReports) {

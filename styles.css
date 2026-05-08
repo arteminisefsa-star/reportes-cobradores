@@ -255,9 +255,36 @@ button.danger:hover {
   border-bottom: 1px solid var(--line);
   display: grid;
   gap: 12px;
-  grid-template-columns: 180px minmax(180px, 260px);
+  grid-template-columns: 180px 180px minmax(180px, 260px) minmax(180px, 1fr) minmax(180px, 1fr);
   margin-bottom: 16px;
   padding-bottom: 16px;
+}
+
+.filter-total {
+  align-self: end;
+  background: #eef4f3;
+  border-left: 4px solid var(--primary);
+  min-height: 45px;
+  padding: 8px 12px;
+}
+
+.filter-total span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.filter-total strong {
+  display: block;
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.filter-total-expense {
+  background: #fff6eb;
+  border-left-color: var(--warn);
 }
 
 .summary-grid {
