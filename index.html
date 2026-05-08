@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reportes de cobradores</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <div>
+          <h1>Reportes</h1>
+          <p>Control diario de cobranzas</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="today" id="currentDate"></div>
+        <button class="admin-login" id="adminAccess" type="button">Administrador</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="entry-panel" aria-labelledby="formTitle">
+        <div class="section-heading">
+          <h2 id="formTitle">Nuevo reporte</h2>
+          <span class="status-dot">Guardado local</span>
+        </div>
+
+        <form id="reportForm" autocomplete="off">
+          <label>
+            <span>Cobrador</span>
+            <input list="collectors" id="collector" name="collector" required placeholder="Seleccionar nombre">
+          </label>
+
+          <datalist id="collectors">
+            <option value="Felipe Pico"></option>
+            <option value="Carlos Gomez"></option>
+            <option value="Franco Nicolas Encina"></option>
+            <option value="Gustavo Gimenez"></option>
+            <option value="Maria Jose Lobos"></option>
+            <option value="Maryuri Lopez"></option>
+            <option value="Matias Martinez"></option>
+            <option value="Walter Martinez"></option>
+            <option value="Mariana Quinteros"></option>
+            <option value="Alejandro Balberdi"></option>
+            <option value="Alejandro Gamarra"></option>
+            <option value="Mario Veron"></option>
+            <option value="Resquin Alejandra"></option>
+            <option value="Rodrigo Galeano"></option>
+            <option value="Damian Alvarez"></option>
+            <option value="Enrique Sibilla"></option>
+            <option value="Nilson Lopez"></option>
+          </datalist>
+
+          <div class="amount-grid">
+            <label>
+              <span>Efectivo</span>
+              <input inputmode="decimal" id="cash" name="cash" placeholder="0">
+            </label>
+
+            <label>
+              <span>Transferencia</span>
+              <input inputmode="decimal" id="transfer" name="transfer" placeholder="0">
+            </label>
+
+            <label>
+              <span>Gastos</span>
+              <input inputmode="decimal" id="expenses" name="expenses" placeholder="0">
+            </label>
+          </div>
+
+          <label>
+            <span>Especificacion de gastos</span>
+            <textarea id="expenseDetail" name="expenseDetail" rows="3" placeholder="Ej: Nafta, almuerzo, arreglo"></textarea>
+          </label>
+
+          <label>
+            <span>Diferencias u observaciones</span>
+            <textarea id="notes" name="notes" rows="3" placeholder="Opcional"></textarea>
+          </label>
+
+          <div class="calculation-strip" aria-live="polite">
+            <div>
+              <span>Total de cobro</span>
+              <strong id="previewTotal">$ 0</strong>
+            </div>
+            <div>
+              <span>Cobro neto</span>
+              <strong id="previewNet">$ 0</strong>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="secondary" type="reset">Limpiar</button>
+            <button id="submitReport" type="submit">Guardar reporte</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="admin-panel is-hidden" id="adminPanel" aria-labelledby="adminTitle">
+        <div class="section-heading admin-heading">
+          <div>
+            <h2 id="adminTitle">Panel administrador</h2>
+            <p>Calculo: total = efectivo + transferencia; neto = total - gastos.</p>
+          </div>
+          <div class="admin-actions">
+            <button class="secondary" id="exportCsv" type="button">Exportar CSV</button>
+            <button class="danger" id="clearReports" type="button">Borrar datos</button>
+          </div>
+        </div>
+
+        <div class="filters" aria-label="Filtros">
+          <label>
+            <span>Fecha desde</span>
+            <input type="date" id="dateFromFilter">
+          </label>
+          <label>
+            <span>Fecha hasta</span>
+            <input type="date" id="dateToFilter">
+          </label>
+          <label>
+            <span>Cobrador</span>
+            <select id="collectorFilter">
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="summary-grid" id="summaryGrid">
+          <article>
+            <span>Efectivo</span>
+            <strong id="sumCash">$ 0</strong>
+          </article>
+          <article>
+            <span>Transferencia</span>
+            <strong id="sumTransfer">$ 0</strong>
+          </article>
+          <article>
+            <span>Gastos</span>
+            <strong id="sumExpenses">$ 0</strong>
+          </article>
+          <article>
+            <span>Total de cobro</span>
+            <strong id="sumTotal">$ 0</strong>
+          </article>
+          <article>
+            <span>Cobro neto</span>
+            <strong id="sumNet">$ 0</strong>
+          </article>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Marca temporal</th>
+                <th>Cobrador</th>
+                <th>Efectivo</th>
+                <th>Transferencia</th>
+                <th>Gastos</th>
+                <th>Total de cobro</th>
+                <th>Cobro neto</th>
+                <th>Gastos detalle</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="reportRows"></tbody>
+          </table>
+          <div class="empty-state" id="emptyState">
+            <strong>No hay reportes cargados</strong>
+            <span>Cuando guardes el primer reporte, aparecera aca.</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
