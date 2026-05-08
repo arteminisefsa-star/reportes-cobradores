@@ -43,6 +43,8 @@ const dateFromFilter = document.querySelector("#dateFromFilter");
 const dateToFilter = document.querySelector("#dateToFilter");
 const collectorFilter = document.querySelector("#collectorFilter");
 const exportCsv = document.querySelector("#exportCsv");
+const importCsv = document.querySelector("#importCsv");
+const importCsvInput = document.querySelector("#importCsvInput");
 const clearReports = document.querySelector("#clearReports");
 const formTitle = document.querySelector("#formTitle");
 const submitReport = document.querySelector("#submitReport");
@@ -154,6 +156,20 @@ async function persistClearReports() {
   await refreshReports();
 }
 
+async function persistImportedReports(importedReports) {
+  if (usesLocalFile) {
+    reports = [...importedReports, ...reports];
+    saveLocalReports();
+    return;
+  }
+
+  await apiRequest("/api/reports/import", {
+    method: "POST",
+    body: JSON.stringify({ reports: importedReports }),
+  });
+  await refreshReports();
+}
+
 function parseMoney(value) {
   if (!value) return 0;
   const normalized = String(value)
@@ -205,6 +221,118 @@ function normalizeReport(report) {
   const expenses = Number(report.expenses) || 0;
   const { total, net } = calculate(cash, transfer, expenses);
   return { ...report, cash, transfer, expenses, total, net };
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let insideQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && insideQuotes && next === '"') {
+      cell += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+      continue;
+    }
+
+    if ((char === ";" || char === ",") && !insideQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !insideQuotes) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell);
+  if (row.some((value) => value.trim())) rows.push(row);
+  return rows;
+}
+
+function normalizeHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function parseSheetDate(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!match) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+  }
+
+  const [, day, month, year, hour = "0", minute = "0", second = "0"] = match;
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  ).toISOString();
+}
+
+function csvRowsToReports(rows) {
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(normalizeHeader);
+  const indexOf = (...names) => {
+    const normalizedNames = names.map(normalizeHeader);
+    return headers.findIndex((header) => normalizedNames.includes(header));
+  };
+
+  const indexes = {
+    createdAt: indexOf("Marca temporal", "Fecha"),
+    cash: indexOf("Efectivo"),
+    transfer: indexOf("Transferencia"),
+    expenses: indexOf("Gastos"),
+    collector: indexOf("Seleccionar Nombre", "Cobrador", "Nombre"),
+    expenseDetail: indexOf("Especificacion de gastos", "Especificación de gastos", "Gastos detalle"),
+    notes: indexOf("Diferencias u observaciones", "Observaciones"),
+  };
+
+  return rows.slice(1).map((row) => {
+    const cash = parseMoney(row[indexes.cash]);
+    const transfer = parseMoney(row[indexes.transfer]);
+    const expenses = parseMoney(row[indexes.expenses]);
+    const { total, net } = calculate(cash, transfer, expenses);
+
+    return {
+      id: makeId(),
+      createdAt: indexes.createdAt >= 0 ? parseSheetDate(row[indexes.createdAt]) : new Date().toISOString(),
+      collector: indexes.collector >= 0 ? String(row[indexes.collector] || "").trim() : "",
+      cash,
+      transfer,
+      expenses,
+      expenseDetail: indexes.expenseDetail >= 0 ? String(row[indexes.expenseDetail] || "").trim() : "",
+      notes: indexes.notes >= 0 ? String(row[indexes.notes] || "").trim() : "",
+      total,
+      net,
+    };
+  }).filter((report) => report.collector || report.cash || report.transfer || report.expenses);
 }
 
 function updatePreview() {
@@ -563,6 +691,32 @@ dateFromFilter.addEventListener("input", render);
 dateToFilter.addEventListener("input", render);
 collectorFilter.addEventListener("input", render);
 exportCsv.addEventListener("click", downloadCsv);
+importCsv.addEventListener("click", () => importCsvInput.click());
+
+importCsvInput.addEventListener("change", async () => {
+  const file = importCsvInput.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const importedReports = csvRowsToReports(parseCsv(text));
+    if (!importedReports.length) {
+      alert("No se encontraron reportes para importar");
+      return;
+    }
+
+    const confirmed = confirm(`Se importaran ${importedReports.length} reportes. ¿Continuar?`);
+    if (!confirmed) return;
+
+    await persistImportedReports(importedReports);
+    render();
+    alert(`Se importaron ${importedReports.length} reportes`);
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    importCsvInput.value = "";
+  }
+});
 
 clearReports.addEventListener("click", async () => {
   const confirmed = confirm("Esto borra todos los reportes guardados. ¿Seguro?");

@@ -160,6 +160,48 @@ app.post("/api/reports", async (request, response) => {
   response.status(201).json({ report });
 });
 
+app.post("/api/reports/import", requireAdmin, async (request, response) => {
+  const imported = Array.isArray(request.body.reports)
+    ? request.body.reports.map((item) => ({
+        id: crypto.randomUUID(),
+        createdAt: item.createdAt || new Date().toISOString(),
+        ...cleanReport(item),
+      }))
+    : [];
+
+  if (!imported.length) return response.status(400).json({ error: "No hay reportes para importar" });
+
+  if (pool) {
+    for (const report of imported) {
+      await pool.query(
+        `
+          insert into reports
+            (id, created_at, collector, cash, transfer, expenses, expense_detail, notes, total, net)
+          values
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `,
+        [
+          report.id,
+          report.createdAt,
+          report.collector,
+          report.cash,
+          report.transfer,
+          report.expenses,
+          report.expenseDetail,
+          report.notes,
+          report.total,
+          report.net,
+        ],
+      );
+    }
+  } else {
+    const reports = await readReports();
+    await writeReports([...imported, ...reports]);
+  }
+
+  response.status(201).json({ imported: imported.length });
+});
+
 app.patch("/api/reports/:id", requireAdmin, async (request, response) => {
   const updated = cleanReport(request.body || {});
   const updatedAt = new Date().toISOString();

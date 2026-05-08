@@ -243,6 +243,10 @@ button.danger:hover {
   background: #c9e7e1;
 }
 
+.file-input {
+  display: none;
+}
+
 .is-hidden {
   display: none;
 }
