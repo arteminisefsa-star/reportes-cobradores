@@ -8,11 +8,20 @@ const app = express();
 const port = process.env.PORT || 10000;
 const adminPassword = process.env.ADMIN_PASSWORD || "1234";
 const dataFile = path.join(__dirname, "data", "reports.json");
+const databaseUrl = process.env.DATABASE_URL || "";
 
-const pool = process.env.DATABASE_URL
+function databaseSslConfig(url) {
+  if (!url || url.includes("localhost") || url.includes("127.0.0.1")) return false;
+  if (url.includes(".render.com") || url.includes("sslmode=require")) {
+    return { rejectUnauthorized: false };
+  }
+  return false;
+}
+
+const pool = databaseUrl
   ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+      connectionString: databaseUrl,
+      ssl: databaseSslConfig(databaseUrl),
       max: 1,
       connectionTimeoutMillis: 10000,
     })
