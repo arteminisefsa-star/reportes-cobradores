@@ -143,6 +143,19 @@
           </article>
         </div>
 
+        <section class="collector-manager" aria-labelledby="collectorManagerTitle">
+          <div>
+            <h3 id="collectorManagerTitle">Cobradores</h3>
+            <p>Agregar, editar o borrar nombres disponibles en el formulario.</p>
+          </div>
+          <form class="collector-form" id="collectorForm" autocomplete="off">
+            <input id="collectorNameInput" placeholder="Nombre del cobrador">
+            <button id="saveCollector" type="submit">Agregar</button>
+            <button class="secondary is-hidden" id="cancelCollectorEdit" type="button">Cancelar</button>
+          </form>
+          <div class="collector-list" id="collectorList"></div>
+        </section>
+
         <div class="table-wrap">
           <table>
             <thead>

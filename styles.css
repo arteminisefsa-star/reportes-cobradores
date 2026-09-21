@@ -316,6 +316,64 @@ button.danger:hover {
   border-top: 4px solid var(--primary);
 }
 
+.collector-manager {
+  background: #f8fafb;
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.collector-manager h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.collector-manager p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.collector-form {
+  align-items: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+}
+
+.collector-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.collector-item {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.collector-item span {
+  font-weight: 700;
+}
+
+.collector-item div {
+  display: flex;
+  gap: 6px;
+}
+
+.collector-item button {
+  min-height: 32px;
+  padding: 6px 9px;
+}
+
 .table-wrap {
   overflow: auto;
   position: relative;
@@ -494,9 +552,15 @@ td.money {
 
   .amount-grid,
   .calculation-strip,
+  .collector-form,
   .filters,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .collector-item {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .table-wrap {

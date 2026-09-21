@@ -1,15 +1,18 @@
 const storageKey = "reportes-cobradores-v1";
+const collectorsStorageKey = "reportes-cobradores-collectors-v1";
 const localAdminPassword = "1234";
 const usesLocalFile = window.location.protocol === "file:";
-const collectors = [
+const defaultCollectors = [
   "Felipe Pico",
   "Carlos Gomez",
   "Franco Nicolas Encina",
   "Gustavo Gimenez",
-  "Maryuri 1",
+  "Maria Jose Lobos",
   "Maryuri Lopez",
   "Matias Martinez",
   "Walter Martinez",
+  "Mariana Quinteros",
+  "Alejandro Balberdi",
   "Alejandro Gamarra",
   "Mario Veron",
   "Resquin Alejandra",
@@ -18,6 +21,8 @@ const collectors = [
   "Enrique Sibilla",
   "Nilson Lopez",
 ];
+let collectors = [...defaultCollectors];
+let collectorRecords = defaultCollectors.map((name, index) => ({ id: String(index), name }));
 
 const form = document.querySelector("#reportForm");
 const currentDate = document.querySelector("#currentDate");
@@ -48,6 +53,11 @@ const formTitle = document.querySelector("#formTitle");
 const submitReport = document.querySelector("#submitReport");
 const filterNetTotal = document.querySelector("#filterNetTotal");
 const filterExpenseTotal = document.querySelector("#filterExpenseTotal");
+const collectorForm = document.querySelector("#collectorForm");
+const collectorNameInput = document.querySelector("#collectorNameInput");
+const saveCollector = document.querySelector("#saveCollector");
+const cancelCollectorEdit = document.querySelector("#cancelCollectorEdit");
+const collectorList = document.querySelector("#collectorList");
 
 const summary = {
   cash: document.querySelector("#sumCash"),
@@ -61,6 +71,7 @@ let reports = [];
 let isAdmin = sessionStorage.getItem("reportes-admin") === "true";
 let adminPassword = sessionStorage.getItem("reportes-admin-password") || "";
 let editingId = null;
+let editingCollectorId = null;
 
 function loadLocalReports() {
   try {
@@ -72,6 +83,23 @@ function loadLocalReports() {
 
 function saveLocalReports() {
   localStorage.setItem(storageKey, JSON.stringify(reports));
+}
+
+function loadLocalCollectors() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(collectorsStorageKey));
+    return Array.isArray(saved) && saved.length ? saved.map(String) : [...defaultCollectors];
+  } catch {
+    return [...defaultCollectors];
+  }
+}
+
+function saveLocalCollectors() {
+  localStorage.setItem(collectorsStorageKey, JSON.stringify(collectors));
+}
+
+function syncCollectorRecords() {
+  collectorRecords = collectors.map((name, index) => ({ id: String(index), name }));
 }
 
 async function apiRequest(path, options = {}) {
@@ -98,6 +126,22 @@ async function loadServerReports() {
 
 async function refreshReports() {
   reports = usesLocalFile ? loadLocalReports() : await loadServerReports();
+  render();
+}
+
+async function refreshCollectors() {
+  if (usesLocalFile) {
+    collectors = loadLocalCollectors();
+    syncCollectorRecords();
+    renderCollectorSelect(fields.collector.value);
+    render();
+    return;
+  }
+
+  const data = await apiRequest("/api/collectors");
+  collectorRecords = (data.collectors || []).filter((collector) => collector.name);
+  collectors = collectorRecords.map((collector) => collector.name);
+  renderCollectorSelect(fields.collector.value);
   render();
 }
 
@@ -166,6 +210,52 @@ async function persistImportedReports(importedReports) {
     body: JSON.stringify({ reports: importedReports }),
   });
   await refreshReports();
+}
+
+async function persistNewCollector(name) {
+  if (usesLocalFile) {
+    collectors.push(name);
+    syncCollectorRecords();
+    saveLocalCollectors();
+    return;
+  }
+
+  await apiRequest("/api/collectors", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  await refreshCollectors();
+}
+
+async function persistUpdatedCollector(index, name) {
+  if (usesLocalFile) {
+    collectors[index] = name;
+    syncCollectorRecords();
+    saveLocalCollectors();
+    return;
+  }
+
+  const id = collectorRecords[index]?.id;
+  if (!id) throw new Error("No se encontro el cobrador");
+  await apiRequest(`/api/collectors/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  await refreshCollectors();
+}
+
+async function persistDeletedCollector(index) {
+  if (usesLocalFile) {
+    collectors = collectors.filter((collector, itemIndex) => itemIndex !== index);
+    syncCollectorRecords();
+    saveLocalCollectors();
+    return;
+  }
+
+  const id = collectorRecords[index]?.id;
+  if (!id) throw new Error("No se encontro el cobrador");
+  await apiRequest(`/api/collectors/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await refreshCollectors();
 }
 
 function parseMoney(value) {
@@ -379,10 +469,43 @@ function renderCollectorSelect(selected = "") {
   fields.collector.value = collectors.includes(selected) ? selected : "";
 }
 
+function renderCollectorManager() {
+  collectorList.innerHTML = "";
+  for (const [index, name] of collectors.entries()) {
+    const item = document.createElement("div");
+    item.className = "collector-item";
+    item.innerHTML = `
+      <span>${escapeHtml(name)}</span>
+      <div>
+        <button class="secondary" type="button" data-collector-action="edit" data-collector-id="${escapeAttribute(index)}">Editar</button>
+        <button class="danger" type="button" data-collector-action="delete" data-collector-id="${escapeAttribute(index)}">Borrar</button>
+      </div>
+    `;
+    collectorList.append(item);
+  }
+}
+
+function resetCollectorEditor() {
+  editingCollectorId = null;
+  collectorNameInput.value = "";
+  saveCollector.textContent = "Agregar";
+  cancelCollectorEdit.classList.add("is-hidden");
+}
+
+function cleanCollectorName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function collectorNameExists(name, ignoreIndex = -1) {
+  const normalized = name.toLowerCase();
+  return collectors.some((collector, index) => index !== ignoreIndex && collector.toLowerCase() === normalized);
+}
+
 function collectorOptionsHtml(selected = "") {
+  const names = selected && !collectors.includes(selected) ? [selected, ...collectors] : collectors;
   return [
     '<option value="">Seleccionar cobrador</option>',
-    ...collectors.map((name) => {
+    ...names.map((name) => {
       const isSelected = name === selected ? " selected" : "";
       return `<option value="${escapeAttribute(name)}"${isSelected}>${escapeHtml(name)}</option>`;
     }),
@@ -545,6 +668,8 @@ function render() {
   formTitle.textContent = "Nuevo reporte";
   submitReport.textContent = "Guardar reporte";
   renderCollectorFilter();
+  renderCollectorSelect(fields.collector.value);
+  renderCollectorManager();
   const visibleReports = getFilteredReports();
   renderSummary(visibleReports);
   renderRows(visibleReports);
@@ -616,6 +741,7 @@ adminAccess.addEventListener("click", async () => {
     isAdmin = false;
     adminPassword = "";
     editingId = null;
+    resetCollectorEditor();
     sessionStorage.removeItem("reportes-admin");
     sessionStorage.removeItem("reportes-admin-password");
     reports = usesLocalFile ? loadLocalReports() : [];
@@ -716,6 +842,68 @@ importCsvInput.addEventListener("change", async () => {
   }
 });
 
+collectorForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const name = cleanCollectorName(collectorNameInput.value);
+  const editingIndex = editingCollectorId === null ? -1 : Number(editingCollectorId);
+  if (!name) {
+    alert("Escribi un nombre");
+    return;
+  }
+  if (collectorNameExists(name, editingIndex)) {
+    alert("Ese cobrador ya existe");
+    return;
+  }
+
+  try {
+    if (editingCollectorId === null) {
+      await persistNewCollector(name);
+    } else {
+      await persistUpdatedCollector(editingIndex, name);
+    }
+    resetCollectorEditor();
+    render();
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+cancelCollectorEdit.addEventListener("click", () => {
+  resetCollectorEditor();
+});
+
+collectorList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-collector-action]");
+  if (!button) return;
+
+  const index = Number(button.dataset.collectorId);
+  const name = collectors[index];
+  if (!name) return;
+
+  if (button.dataset.collectorAction === "edit") {
+    editingCollectorId = String(index);
+    collectorNameInput.value = name;
+    saveCollector.textContent = "Guardar";
+    cancelCollectorEdit.classList.remove("is-hidden");
+    collectorNameInput.focus();
+    return;
+  }
+
+  if (button.dataset.collectorAction === "delete") {
+    const confirmed = confirm(`Borrar "${name}" de la lista de cobradores? Los reportes existentes no se modifican.`);
+    if (!confirmed) return;
+
+    try {
+      await persistDeletedCollector(index);
+      if (editingCollectorId === String(index)) resetCollectorEditor();
+      render();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+});
+
 clearReports.addEventListener("click", async () => {
   const confirmed = confirm("Esto borra todos los reportes guardados. ¿Seguro?");
   if (!confirmed) return;
@@ -805,6 +993,10 @@ currentDate.textContent = new Intl.DateTimeFormat("es-AR", {
 
 renderCollectorSelect();
 updatePreview();
+refreshCollectors().catch((error) => {
+  console.error(error);
+  render();
+});
 refreshReports().catch((error) => {
   console.error(error);
   render();

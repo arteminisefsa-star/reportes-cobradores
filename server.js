@@ -8,7 +8,27 @@ const app = express();
 const port = process.env.PORT || 10000;
 const adminPassword = process.env.ADMIN_PASSWORD || "1234";
 const dataFile = path.join(__dirname, "data", "reports.json");
+const collectorsFile = path.join(__dirname, "data", "collectors.json");
 const databaseUrl = process.env.DATABASE_URL || "";
+const defaultCollectors = [
+  "Felipe Pico",
+  "Carlos Gomez",
+  "Franco Nicolas Encina",
+  "Gustavo Gimenez",
+  "Maria Jose Lobos",
+  "Maryuri Lopez",
+  "Matias Martinez",
+  "Walter Martinez",
+  "Mariana Quinteros",
+  "Alejandro Balberdi",
+  "Alejandro Gamarra",
+  "Mario Veron",
+  "Resquin Alejandra",
+  "Rodrigo Galeano",
+  "Damian Alvarez",
+  "Enrique Sibilla",
+  "Nilson Lopez",
+];
 
 function databaseSslConfig(url) {
   if (!url || url.includes("localhost") || url.includes("127.0.0.1")) return false;
@@ -85,6 +105,24 @@ async function ensureDatabase() {
         net numeric not null default 0
       )
     `);
+    await pool.query(`
+      create table if not exists collectors (
+        id text primary key,
+        name text not null unique,
+        position integer not null default 0,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz
+      )
+    `);
+    const result = await pool.query("select count(*)::int as count from collectors");
+    if (!result.rows[0]?.count) {
+      for (const [index, name] of defaultCollectors.entries()) {
+        await pool.query(
+          "insert into collectors (id, name, position) values ($1, $2, $3)",
+          [crypto.randomUUID(), name, index],
+        );
+      }
+    }
     return;
   }
 
@@ -93,6 +131,11 @@ async function ensureDatabase() {
     await fs.access(dataFile);
   } catch {
     await fs.writeFile(dataFile, "[]");
+  }
+  try {
+    await fs.access(collectorsFile);
+  } catch {
+    await fs.writeFile(collectorsFile, JSON.stringify(defaultCollectors, null, 2));
   }
 }
 
@@ -126,7 +169,99 @@ async function writeReports(reports) {
   await fs.writeFile(dataFile, JSON.stringify(reports, null, 2));
 }
 
+function cleanCollectorName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+async function readCollectors() {
+  if (pool) {
+    const result = await pool.query("select id, name from collectors order by position asc, name asc");
+    return result.rows;
+  }
+
+  const raw = await fs.readFile(collectorsFile, "utf8");
+  return JSON.parse(raw || "[]").map((name, index) => ({ id: String(index), name }));
+}
+
+async function writeCollectorNames(names) {
+  await fs.writeFile(collectorsFile, JSON.stringify(names, null, 2));
+}
+
 app.post("/api/admin/check", requireAdmin, (request, response) => {
+  response.json({ ok: true });
+});
+
+app.get("/api/collectors", async (request, response) => {
+  response.json({ collectors: await readCollectors() });
+});
+
+app.post("/api/collectors", requireAdmin, async (request, response) => {
+  const name = cleanCollectorName(request.body?.name);
+  if (!name) return response.status(400).json({ error: "El nombre es obligatorio" });
+
+  if (pool) {
+    try {
+      const positionResult = await pool.query("select coalesce(max(position), -1) + 1 as position from collectors");
+      const result = await pool.query(
+        "insert into collectors (id, name, position) values ($1, $2, $3) returning id, name",
+        [crypto.randomUUID(), name, Number(positionResult.rows[0]?.position || 0)],
+      );
+      return response.status(201).json({ collector: result.rows[0] });
+    } catch (error) {
+      if (error.code === "23505") return response.status(409).json({ error: "Ese cobrador ya existe" });
+      throw error;
+    }
+  }
+
+  const collectors = await readCollectors();
+  if (collectors.some((collector) => collector.name.toLowerCase() === name.toLowerCase())) {
+    return response.status(409).json({ error: "Ese cobrador ya existe" });
+  }
+  const names = [...collectors.map((collector) => collector.name), name];
+  await writeCollectorNames(names);
+  response.status(201).json({ collector: { id: String(names.length - 1), name } });
+});
+
+app.patch("/api/collectors/:id", requireAdmin, async (request, response) => {
+  const name = cleanCollectorName(request.body?.name);
+  if (!name) return response.status(400).json({ error: "El nombre es obligatorio" });
+
+  if (pool) {
+    try {
+      const result = await pool.query(
+        "update collectors set name = $2, updated_at = now() where id = $1 returning id, name",
+        [request.params.id, name],
+      );
+      if (!result.rows[0]) return response.status(404).json({ error: "No encontrado" });
+      return response.json({ collector: result.rows[0] });
+    } catch (error) {
+      if (error.code === "23505") return response.status(409).json({ error: "Ese cobrador ya existe" });
+      throw error;
+    }
+  }
+
+  const collectors = await readCollectors();
+  const index = Number(request.params.id);
+  if (!Number.isInteger(index) || !collectors[index]) return response.status(404).json({ error: "No encontrado" });
+  if (collectors.some((collector, itemIndex) => itemIndex !== index && collector.name.toLowerCase() === name.toLowerCase())) {
+    return response.status(409).json({ error: "Ese cobrador ya existe" });
+  }
+  const names = collectors.map((collector) => collector.name);
+  names[index] = name;
+  await writeCollectorNames(names);
+  response.json({ collector: { id: String(index), name } });
+});
+
+app.delete("/api/collectors/:id", requireAdmin, async (request, response) => {
+  if (pool) {
+    await pool.query("delete from collectors where id = $1", [request.params.id]);
+    return response.json({ ok: true });
+  }
+
+  const collectors = await readCollectors();
+  const index = Number(request.params.id);
+  if (!Number.isInteger(index) || !collectors[index]) return response.status(404).json({ error: "No encontrado" });
+  await writeCollectorNames(collectors.filter((collector, itemIndex) => itemIndex !== index).map((collector) => collector.name));
   response.json({ ok: true });
 });
 
