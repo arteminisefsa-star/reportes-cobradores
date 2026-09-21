@@ -53,6 +53,9 @@ const formTitle = document.querySelector("#formTitle");
 const submitReport = document.querySelector("#submitReport");
 const filterNetTotal = document.querySelector("#filterNetTotal");
 const filterExpenseTotal = document.querySelector("#filterExpenseTotal");
+const manageCollectors = document.querySelector("#manageCollectors");
+const collectorModal = document.querySelector("#collectorModal");
+const closeCollectorModal = document.querySelector("#closeCollectorModal");
 const collectorForm = document.querySelector("#collectorForm");
 const collectorNameInput = document.querySelector("#collectorNameInput");
 const saveCollector = document.querySelector("#saveCollector");
@@ -501,6 +504,18 @@ function collectorNameExists(name, ignoreIndex = -1) {
   return collectors.some((collector, index) => index !== ignoreIndex && collector.toLowerCase() === normalized);
 }
 
+function openCollectorModal() {
+  collectorModal.classList.remove("is-hidden");
+  collectorModal.setAttribute("aria-hidden", "false");
+  collectorNameInput.focus();
+}
+
+function closeCollectors() {
+  resetCollectorEditor();
+  collectorModal.classList.add("is-hidden");
+  collectorModal.setAttribute("aria-hidden", "true");
+}
+
 function collectorOptionsHtml(selected = "") {
   const names = selected && !collectors.includes(selected) ? [selected, ...collectors] : collectors;
   return [
@@ -816,6 +831,14 @@ dateToFilter.addEventListener("input", render);
 collectorFilter.addEventListener("input", render);
 exportCsv.addEventListener("click", downloadCsv);
 importCsv.addEventListener("click", () => importCsvInput.click());
+manageCollectors.addEventListener("click", openCollectorModal);
+closeCollectorModal.addEventListener("click", closeCollectors);
+collectorModal.addEventListener("click", (event) => {
+  if (event.target === collectorModal) closeCollectors();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !collectorModal.classList.contains("is-hidden")) closeCollectors();
+});
 
 importCsvInput.addEventListener("change", async () => {
   const file = importCsvInput.files[0];
